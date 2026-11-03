@@ -17,6 +17,9 @@ function needData(el) {
   return false;
 }
 
+/** Petunjuk mengisi alamat API (Vercel: env var + Redeploy; tanpa build: config.js). */
+const API_HINT = 'Pengelola: Vercel → Settings → Environment Variables → isi SIMAKO_API_URL dengan URL /exec → Deployments → Redeploy. (Hosting tanpa build: isi API_URL di config.js.)';
+
 /* ============================ LOGIN ============================ */
 registerPage('login', {
   auth: 'guest', title: 'Masuk', live: false,
@@ -33,7 +36,7 @@ registerPage('login', {
       '<div id="l-err" class="banner red" hidden role="alert"></div>' +
       '<button class="btn btn-primary btn-lg btn-block" id="l-btn" type="submit">Masuk</button>' +
       '<p class="small muted center">Lupa sandi? Minta Pemilik me-reset sandi Anda di menu Kelola Pengguna.</p></form>' +
-      (CFG.API_URL ? '' : '<div class="banner amber mt16"><div>' + ic('triangle-alert') + '</div><div><b>Alamat API belum diisi</b><span>Buka file config.js lalu isi API_URL dengan URL /exec dari Apps Script.</span></div></div>') +
+      (CFG.API_URL ? '' : '<div class="banner amber mt16"><div>' + ic('triangle-alert') + '</div><div><b>Alamat API belum diisi</b><span>' + API_HINT + '</span></div></div>') +
       '</div></div>';
     const last = LS.get('lastEmail'); if (last) $('#l-email', el).value = last;
     $('#l-eye', el).onclick = () => { const p = $('#l-pw', el); p.type = p.type === 'password' ? 'text' : 'password'; $('#l-eye', el).innerHTML = ic(p.type === 'password' ? 'eye' : 'eye-off'); };
@@ -69,20 +72,24 @@ registerPage('teknis', {
       '<li>Tempel semua file <code>.gs</code> ke proyek Apps Script, simpan.</li>' +
       '<li>Jalankan fungsi <b>setupAplikasi</b> sekali → catat email & sandi Pemilik di log.</li>' +
       '<li>Deploy → New deployment → Web app · Execute as: <b>Me</b> · Who has access: <b>Anyone</b>.</li>' +
-      '<li>Salin URL <code>/exec</code> ke <code>config.js</code> (API_URL), unggah frontend ke Vercel/GitHub Pages.</li>' +
+      '<li>Vercel → <b>Settings → Environment Variables</b> → <code>SIMAKO_API_URL</code> = URL <code>/exec</code> → <b>Deployments → Redeploy</b>.</li>' +
       '<li>Opsional: jalankan <b>isiDataContoh</b> untuk latihan.</li></ol></div>' +
       '<div class="card card-pad stack-sm"><h3 class="h-sm">Fungsi editor Apps Script</h3><div class="small muted" style="line-height:1.9">' +
       '<b>resetSandiPemilik</b> — sandi baru untuk Pemilik · <b>cekPerforma</b> — status cache & pemicu · <b>bersihkanCache</b> — setelah edit manual di Sheet · <b>cadanganSekarang</b> — salin Sheet ke Drive · <b>matikanKeepWarm</b>/<b>nyalakanKeepWarm</b></div></div>' +
       '<div id="tk-sys"></div>' +
       '<a class="btn btn-ghost" href="' + (Session.token ? '#/lainnya' : '#/beranda') + '">' + ic('arrow-left') + 'Kembali ke aplikasi</a></div>';
     const box = $('#tk-health', el);
-    if (!CFG.API_URL) { box.innerHTML = '<div class="banner red"><div>' + ic('circle-alert') + '</div><div><b>API_URL kosong</b><span>Isi config.js dengan URL /exec.</span></div></div>'; return; }
+    const buildInfo = '<div class="small muted">Frontend ' + esc(CFG.BUILD || APP_VER + ' (tanpa build)') + '</div>';
+    if (!CFG.API_URL) { box.innerHTML = '<div class="banner red"><div>' + ic('circle-alert') + '</div><div><b>API_URL kosong</b><span>' + API_HINT + '</span></div></div>' + buildInfo; return; }
     const t0 = performance.now();
     const r = await api('health', {}, { vers: false });
     const ms = Math.round(performance.now() - t0);
+    const mismatch = r.success && r.data.contract !== API_CONTRACT;
     box.innerHTML = r.success
-      ? '<div class="banner ' + (r.data.ready ? 'green' : 'amber') + '"><div>' + ic(r.data.ready ? 'circle-check' : 'triangle-alert') + '</div><div><b>' + (r.data.ready ? 'Server siap' : 'Server terhubung, tapi setupAplikasi() belum dijalankan') + '</b><span>Versi ' + esc(r.data.v) + ' · kontrak ' + esc(r.data.contract) + ' · ' + ms + ' ms</span></div></div><div class="small muted" style="word-break:break-all">API: ' + esc(CFG.API_URL) + '</div>'
-      : '<div class="banner red"><div>' + ic('circle-alert') + '</div><div><b>Server tidak bisa dihubungi</b><span>' + esc(r.message) + '</span></div></div><div class="small muted">Periksa: URL berakhiran /exec · akses "Anyone" · sudah Deploy versi terbaru.</div>';
+      ? '<div class="banner ' + (r.data.ready ? 'green' : 'amber') + '"><div>' + ic(r.data.ready ? 'circle-check' : 'triangle-alert') + '</div><div><b>' + (r.data.ready ? 'Server siap' : 'Server terhubung, tapi setupAplikasi() belum dijalankan') + '</b><span>Versi ' + esc(r.data.v) + ' · kontrak ' + esc(r.data.contract) + ' · ' + ms + ' ms</span></div></div>' +
+        (mismatch ? '<div class="banner red"><div>' + ic('circle-alert') + '</div><div><b>Versi backend tidak cocok</b><span>Frontend butuh kontrak ' + esc(API_CONTRACT) + ', server memakai ' + esc(r.data.contract || '-') + '. Perbarui kode .gs klien lalu Kelola penerapan → Versi baru.</span></div></div>' : '') +
+        '<div class="small muted" style="word-break:break-all">API: ' + esc(CFG.API_URL) + '</div>' + buildInfo
+      : '<div class="banner red"><div>' + ic('circle-alert') + '</div><div><b>Server tidak bisa dihubungi</b><span>' + esc(r.message) + '</span></div></div><div class="small muted">Periksa: URL berakhiran /exec · akses "Anyone" · sudah Deploy versi terbaru.</div>' + buildInfo;
     if (Session.owner) {
       const s = await api('systemStatus', {}, { vers: false });
       if (s.success) {
