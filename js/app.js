@@ -27,8 +27,8 @@ registerPage('login', {
     warmUpServer();
     el.className = 'page flush';
     el.innerHTML = '<div class="login-wrap"><div class="card login-card">' +
-      '<div class="logo-mark">SM</div>' +
-      '<h1 class="h-hero mt16">Masuk ke Si-MAKO</h1><p class="muted mt8">Catat pesanan, pembayaran, dan tahap produksi konveksi.</p>' +
+      Brand.mark() +
+      '<h1 class="h-hero mt16">Masuk ke ' + esc(Brand.name()) + '</h1><p class="muted mt8">Catat pesanan, pembayaran, dan tahap produksi konveksi.</p>' +
       '<form id="lf" class="stack mt24" novalidate>' +
       '<div class="field"><label for="l-email">Email</label><input id="l-email" class="input" type="email" autocomplete="username" inputmode="email" placeholder="nama@email.com" required></div>' +
       '<div class="field"><label for="l-pw">Sandi</label><div class="input-group"><input id="l-pw" class="input" type="password" autocomplete="current-password" required style="padding-right:52px">' +
@@ -37,7 +37,7 @@ registerPage('login', {
       '<button class="btn btn-primary btn-lg btn-block" id="l-btn" type="submit">Masuk</button>' +
       '<p class="small muted center">Lupa sandi? Minta Pemilik me-reset sandi Anda di menu Kelola Pengguna.</p></form>' +
       (CFG.API_URL ? '' : '<div class="banner amber mt16"><div>' + ic('triangle-alert') + '</div><div><b>Alamat API belum diisi</b><span>' + API_HINT + '</span></div></div>') +
-      '</div></div>';
+      '</div><p class="xs faint center mt16">Si-MAKO · Sistem Manajemen Konveksi</p></div>';
     const last = LS.get('lastEmail'); if (last) $('#l-email', el).value = last;
     $('#l-eye', el).onclick = () => { const p = $('#l-pw', el); p.type = p.type === 'password' ? 'text' : 'password'; $('#l-eye', el).innerHTML = ic(p.type === 'password' ? 'eye' : 'eye-off'); };
     $('#lf', el).onsubmit = async e => {
@@ -66,7 +66,7 @@ registerPage('teknis', {
   async render(el) {
     el.className = 'page';
     el.innerHTML = '<div class="form-narrow stack" style="max-width:720px;margin:0 auto;padding-bottom:40px">' +
-      '<div class="row"><div class="logo-mark">SM</div><div><h1 class="h-lg">Menu Teknis</h1><p class="muted">Untuk Pengelola yang memasang & merawat aplikasi.</p></div></div>' +
+      '<div class="row">' + Brand.mark() + '<div><h1 class="h-lg">Menu Teknis</h1><p class="muted">Untuk Pengelola yang memasang & merawat aplikasi.</p></div></div>' +
       '<div class="card card-pad stack" id="tk-health"><b>Memeriksa server…</b></div>' +
       '<div class="card card-pad stack-sm"><h3 class="h-sm">Langkah pemasangan</h3><ol class="small" style="margin:0;padding-left:18px;line-height:1.9">' +
       '<li>Tempel semua file <code>.gs</code> ke proyek Apps Script, simpan.</li>' +
@@ -106,6 +106,7 @@ registerPage('teknis', {
 /* ============================ BOOT ============================ */
 async function boot() {
   Activity.init();
+  Brand.apply();                                   // warna klien dari perangkat, sebelum layar pertama
   if (new URLSearchParams(location.search).has('setup')) {
     history.replaceState(null, '', location.pathname + '#/teknis');
   }

@@ -109,6 +109,26 @@ registerPage('atur', {
 });
 function settingsFoot(label) { return '<div class="foot-bar"><button type="button" class="btn btn-ghost" onclick="back(\'lainnya\')">Batal</button><button type="submit" class="btn btn-primary">' + ic('check') + esc(label || 'Simpan') + '</button></div>'; }
 
+/** Pilihan warna utama aplikasi (8 warna siap pakai + warna bebas) dengan contoh tombol. */
+function colorField(cur) {
+  cur = /^#[0-9a-f]{6}$/i.test(cur || '') ? cur.toUpperCase() : BRAND_COLORS[0];
+  const custom = BRAND_COLORS.indexOf(cur) < 0;
+  return '<div class="field"><label>Warna utama aplikasi</label><div class="swatches" role="radiogroup" aria-label="Warna utama">' +
+    BRAND_COLORS.map(c => '<label class="swatch" title="' + c + '"><input type="radio" name="warna" value="' + c + '"' + (c === cur ? ' checked' : '') + '><span style="background:' + c + '"></span></label>').join('') +
+    '<label class="swatch custom" title="Warna lain"><input type="radio" name="warna" value="' + (custom ? cur : '#0F172A') + '" data-customradio' + (custom ? ' checked' : '') + '>' +
+    '<span style="background:' + (custom ? cur : 'conic-gradient(#f43f5e,#f59e0b,#22c55e,#06b6d4,#6366f1,#d946ef,#f43f5e)') + '" data-customsw></span><input type="color" data-custom value="' + (custom ? cur : '#0F172A') + '" aria-label="Pilih warna lain"></label></div>' +
+    '<div class="row mt8"><span class="btn btn-sm nowrap" data-swprev style="color:#fff;flex:none">Contoh tombol</span><span class="small muted">Dipakai di tombol, menu, dan halaman masuk. Warna terlalu terang otomatis digelapkan agar tulisan tetap terbaca.</span></div></div>';
+}
+function bindColorField(el) {
+  const prev = () => { const r = $('input[name="warna"]:checked', el); $('[data-swprev]', el).style.background = Brand.palette(r ? r.value : '')['--pri']; };
+  el.addEventListener('change', e => { if (e.target.name === 'warna') prev(); });
+  $('[data-custom]', el).addEventListener('input', e => {
+    const r = $('[data-customradio]', el); r.value = e.target.value; r.checked = true;
+    $('[data-customsw]', el).style.background = e.target.value; prev();
+  });
+  prev();
+}
+
 function renderBizSettings(el) {
   const S = Data.view().settings;
   let banks = (S.rekeningList || []).slice(); let logo = S.logo || '';
@@ -121,6 +141,7 @@ function renderBizSettings(el) {
     '<div class="grow"><label class="btn btn-ghost btn-sm" style="cursor:pointer">' + ic('image-up', 'ico-sm') + 'Ganti logo<input type="file" accept="image/*" data-logofile hidden></label>' + (logo ? ' <button type="button" class="btn btn-sm btn-link danger" data-rmlogo>Hapus</button>' : '') + '<div class="small muted mt8">Gambar persegi, otomatis dikecilkan.</div></div></div>' +
     '<div class="field"><label class="req" for="bz-n">Nama usaha</label><input id="bz-n" class="input" name="nama_usaha" value="' + esc(S.nama_usaha) + '" maxlength="80"></div>' +
     '<div class="field"><label for="bz-t">Keterangan singkat</label><input id="bz-t" class="input" name="tagline" value="' + esc(S.tagline) + '" placeholder="Konveksi & Garment Malang" maxlength="80"></div>' +
+    colorField(S.warna) +
     '<div class="field"><label for="bz-a">Alamat</label><textarea id="bz-a" class="textarea" name="alamat" maxlength="300">' + esc(S.alamat) + '</textarea></div>' +
     '<div class="grid2"><div class="field"><label for="bz-w">No. WhatsApp usaha</label><input id="bz-w" class="input" name="wa" inputmode="tel" value="' + esc(fmt.wa(S.wa)) + '"></div><div class="field"><label for="bz-s">Nama di tanda tangan nota</label><input id="bz-s" class="input" name="ttd_nama" value="' + esc(S.ttd_nama) + '" maxlength="80"></div></div>' +
     '</div><div class="card card-pad stack"><div class="row-between"><h3 class="h-sm">Rekening bank</h3><button type="button" class="btn btn-soft btn-sm" data-addbank>' + ic('plus', 'ico-sm') + 'Tambah</button></div><div class="stack" data-banks>' + bankRows() + '</div>' +
@@ -135,6 +156,7 @@ function renderBizSettings(el) {
     const rb = e.target.closest('[data-rmbank]'); if (rb) { sync(); banks.splice(+rb.dataset.rmbank, 1); $('[data-banks]', el).innerHTML = bankRows(); return; }
     if (e.target.closest('[data-rmlogo]')) { logo = ''; $('[data-logo]', el).innerHTML = '<div class="logo-mark" style="width:64px;height:64px">-</div>'; }
   };
+  bindColorField(el);
   $('[data-logofile]', el).onchange = async e => {
     try { const img = await readImage(e.target.files[0], 240, 0.85); logo = img.dataUrl; if (logo.length > 45000) { const im2 = await readImage(e.target.files[0], 160, 0.7); logo = im2.dataUrl; } $('[data-logo]', el).innerHTML = '<img src="' + logo + '" alt="Logo" style="width:64px;height:64px;border-radius:12px;object-fit:contain">'; }
     catch (er) { UI.toast(er.message, 'err'); }
@@ -144,7 +166,7 @@ function renderBizSettings(el) {
     const d = Object.fromEntries(new FormData(f).entries());
     if (!d.nama_usaha.trim()) { f.nama_usaha.classList.add('invalid'); f.nama_usaha.focus(); return; }
     d.logo = logo; d.rekening = banks.filter(b => b.bank.trim() && b.no.trim());
-    await UI.busy(e.submitter, async () => { const r = await api('saveSettings', d); if (!r.success) return UI.toast(r.message, 'err'); UI.toast('Data usaha tersimpan.'); go('lainnya'); });
+    await UI.busy(e.submitter, async () => { const r = await api('saveSettings', d); if (!r.success) return UI.toast(r.message, 'err'); Brand.fromSettings(Data.view().settings); UI.toast('Data usaha tersimpan.'); go('lainnya'); });
   };
 }
 
@@ -163,7 +185,7 @@ function renderNumbering(el) {
     '<div><div class="small semi mb8">Ketuk kode untuk menambahkan:</div><div class="row wrap">' + codes.map(c => '<button type="button" class="chip" data-code="' + c[0] + '" title="' + c[1] + '">' + c[0] + '</button>').join('') + '</div></div>' +
     '<div><div class="small semi mb8">Contoh siap pakai:</div><div class="row wrap">' + presets.map(p => '<button type="button" class="chip" data-preset="' + esc(p) + '">' + esc(p) + '</button>').join('') + '</div></div>' +
     '<div class="field"><span class="lbl">Nomor urut diulang dari 1 setiap</span><div class="seg" data-reset>' + [['bulan', 'Bulan baru'], ['tahun', 'Tahun baru'], ['tidak', 'Tidak pernah']].map(r => '<button type="button" data-r="' + r[0] + '" class="' + (N.reset === r[0] ? 'on' : '') + '">' + r[1] + '</button>').join('') + '</div></div>' +
-    '<div class="banner" style="background:var(--soft-blue);border-color:#DCE5FF"><div>' + ic('eye') + '</div><div><span>Pratinjau nomor berikutnya</span><b class="num" style="font-size:18px" data-prev></b></div></div></div>' +
+    '<div class="banner" style="background:var(--soft-blue);border-color:var(--pri-tint)"><div>' + ic('eye') + '</div><div><span>Pratinjau nomor berikutnya</span><b class="num" style="font-size:18px" data-prev></b></div></div></div>' +
     settingsFoot('Simpan format') + '</form></div>';
   let reset = N.reset;
   const inp = $('[name=format]', el);

@@ -112,7 +112,7 @@ function itemCard(V, s, it, idx) {
     '<button type="button" class="btn btn-ghost btn-sm mt8" data-addsize>' + ic('plus', 'ico-sm') + 'Tambah ukuran lain (3XL, 4XL, …)</button><div class="err" data-err="qty-' + it.key + '" hidden></div></div>' +
     '<div class="total-pcs"><span class="row semi">' + ic('shirt', 'ico-sm') + 'Total barang ini</span><span class="big" data-pcs>' + fmt.num(pcs) + ' pcs</span></div>' +
     '<div class="grid2"><div class="field"><label for="h-' + it.key + '">Harga satuan</label><div class="input-group"><span class="prefix">Rp</span><input id="h-' + it.key + '" class="input money" data-money inputmode="numeric" value="' + (it.harga_satuan ? fmt.num(it.harga_satuan) : '') + '" placeholder="0"></div></div>' +
-    '<div class="field"><span class="lbl">Subtotal</span><div class="input money num" style="background:var(--soft-blue);border-color:#DCE5FF;display:flex;align-items:center;justify-content:flex-end;color:var(--pri)" data-sub>' + fmt.rp(pcs * (it.harga_satuan || 0)) + '</div></div></div>' +
+    '<div class="field"><span class="lbl">Subtotal</span><div class="input money num" style="background:var(--soft-blue);border-color:var(--pri-tint);display:flex;align-items:center;justify-content:flex-end;color:var(--pri)" data-sub>' + fmt.rp(pcs * (it.harga_satuan || 0)) + '</div></div></div>' +
     '</div></div>';
 }
 function step2(V, s) {
@@ -121,7 +121,7 @@ function step2(V, s) {
     '<button type="button" class="btn btn-soft btn-block btn-lg mt12" data-act="additem">' + ic('plus') + 'Tambah barang lain</button>' +
     '<div class="card card-pad mt12"><label class="check"><input type="checkbox" data-f="pakai_sablon" ' + (s.pakai_sablon ? 'checked' : '') + '><span><b>Ada sablon / bordir</b><br><span class="small muted">Pesanan akan melewati tahap Sablon/Bordir. Bila tidak dicentang, tahap itu dilewati otomatis.</span></span></label>' +
     (s.pakai_sablon ? '<div class="field mt12"><label for="f-cs">Posisi & desain sablon/bordir</label><textarea id="f-cs" class="textarea" data-f="catatan_sablon" maxlength="500" placeholder="Contoh: Bordir logo dada kiri, sablon nama di punggung">' + esc(s.catatan_sablon) + '</textarea></div>' : '') + '</div>' +
-    '<div class="card card-pad mt12" style="background:var(--soft-blue);border-color:#DCE5FF"><div class="row-between"><span class="semi">Total ' + s.items.length + ' barang</span><span class="semi num" data-tpcs>' + fmt.num(tot.pcs) + ' pcs</span></div>' +
+    '<div class="card card-pad mt12" style="background:var(--soft-blue);border-color:var(--pri-tint)"><div class="row-between"><span class="semi">Total ' + s.items.length + ' barang</span><span class="semi num" data-tpcs>' + fmt.num(tot.pcs) + ' pcs</span></div>' +
     '<div class="row-between mt8"><span class="muted">Total harga</span><span class="money-lg" data-ttotal>' + fmt.rp(tot.total) + '</span></div></div>';
 }
 
@@ -163,6 +163,15 @@ function formPayAmount(V, s) {
 }
 function showErr(el, key, msg) { const e = $('[data-err="' + key + '"]', el); if (e) { e.textContent = msg; e.hidden = !msg; } }
 
+/** Tanya dulu bila ada barang tanpa harga, atau nama barang berakhiran angka panjang (harga salah ketik di kolom nama). */
+async function confirmPrices(s) {
+  const noPrice = s.items.filter(it => !(it.harga_satuan > 0)).map(it => it.jenis.trim());
+  const oddName = s.items.filter(it => /[a-z]\S*\d{4,}$/i.test(it.jenis.trim())).map(it => it.jenis.trim());
+  if (!noPrice.length && !oddName.length) return true;
+  const html = (noPrice.length ? 'Harga satuan belum diisi: <b>' + esc(noPrice.join(', ')) + '</b>. Barang ini akan dihitung Rp 0.' : '') +
+    (oddName.length ? (noPrice.length ? '<br><br>' : '') + 'Nama barang berakhiran angka: <b>' + esc(oddName.join(', ')) + '</b>. Apakah harga terketik di kolom nama?' : '');
+  return UI.confirm({ title: 'Periksa harga dulu?', html, ok: 'Tetap lanjut', cancel: 'Periksa lagi' });
+}
 function validateStep(V, s, el) {
   if (s.step === 1) {
     let ok = true;
@@ -315,7 +324,9 @@ function bindForm(el) {
       case 'reset': if (await UI.confirm({ title: 'Mulai pesanan baru?', msg: 'Isian draf sebelumnya akan dihapus.', ok: 'Mulai baru', danger: true })) { LS.del('draft'); OF.s = initForm(V, 'new', null, {}); OF.s.restored = false; renderForm(el); } break;
       case 'cancel': if (s.mode === 'new' && (s.pelanggan_id || s.baru) && !(await UI.confirm({ title: 'Tinggalkan form?', msg: 'Draf tetap tersimpan di perangkat ini dan bisa dilanjutkan nanti.', ok: 'Tinggalkan' }))) break; OF.s = null; back(s.mode === 'edit' ? 'pesanan' : 'beranda'); break;
       case 'prev': s.step--; s.restored = false; rerender(); window.scrollTo(0, 0); break;
-      case 'next': if (!validateStep(V, s, el)) return; s.step++; s.restored = false; rerender(); window.scrollTo(0, 0);
+      case 'next': if (!validateStep(V, s, el)) return;
+        if (s.step === 2 && !(await confirmPrices(s))) return;
+        s.step++; s.restored = false; rerender(); window.scrollTo(0, 0);
         if (s.step === 2) { const f = s.items[0] && $('#j-' + s.items[0].key, el); if (f && !s.items[0].jenis) setTimeout(() => f.focus(), 50); } break;
       case 'save': if (!validateStep(V, s, el)) return; submitForm(V, s, t); break;
     }

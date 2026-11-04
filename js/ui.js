@@ -178,12 +178,54 @@ const BNAV = [
   { id: 'lainnya', label: 'Lainnya', icon: 'layout-grid', href: '#/lainnya' }
 ];
 
+/* ---------- identitas usaha klien: nama, logo, warna utama ----------
+   Disimpan di perangkat (localStorage) agar halaman login sudah tampil
+   dengan identitas klien sebelum data dari server tersedia. */
+const BRAND_COLORS = ['#2B5BF5', '#0F766E', '#15803D', '#B45309', '#BE123C', '#7C3AED', '#334155', '#0E7490'];
+const Brand = {
+  key: '',
+  get() { return LS.get('brand') || {}; },
+  name() { return this.get().nama || CFG.APP_NAME; },
+  /** Logo usaha (gambar) atau inisial dalam kotak warna utama. */
+  mark(cls) {
+    const b = this.get(), src = safeUrl(b.logo);
+    return '<div class="logo-mark' + (src ? ' has-img' : '') + (cls ? ' ' + cls : '') + '">' + (src ? '<img src="' + src + '" alt="">' : esc(b.nama ? fmt.initials(b.nama) : 'SM')) + '</div>';
+  },
+  /** Ambil identitas dari tabel Pengaturan, simpan, lalu terapkan bila berubah. */
+  fromSettings(S) {
+    if (!S || !S.nama_usaha) return;
+    const b = { nama: S.nama_usaha, logo: S.logo || '', warna: S.warna || '' };
+    const k = JSON.stringify(b);
+    if (k === this.key) return;
+    this.key = k; LS.set('brand', b); this.apply();
+    const sb = $('.side-brand .logo-mark'); if (sb) sb.outerHTML = this.mark();
+  },
+  /** Semua varian warna utama dari satu warna; digelapkan bila perlu agar teks putih di atasnya terbaca. */
+  palette(hex) {
+    if (!/^#[0-9a-f]{6}$/i.test(hex || '')) hex = BRAND_COLORS[0];
+    let c = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+    const lum = rgb => { const v = rgb.map(x => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); }); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+    const mix = (rgb, to, t) => rgb.map((x, i) => Math.round(x + (to[i] - x) * t));
+    const toHex = rgb => '#' + rgb.map(x => x.toString(16).padStart(2, '0')).join('');
+    for (let i = 0; i < 20 && lum(c) > 0.18; i++) c = mix(c, [0, 0, 0], 0.08);   // kontras ≥ 4,5 : 1 dengan teks putih
+    const W = [255, 255, 255], K = [0, 0, 0];
+    return { '--pri': toHex(c), '--pri-rgb': c.join(', '), '--pri-hover': toHex(mix(c, W, 0.1)), '--pri-active': toHex(mix(c, K, 0.18)),
+      '--pri-soft': toHex(mix(c, W, 0.92)), '--pri-tint': toHex(mix(c, W, 0.82)), '--soft-blue': toHex(mix(c, W, 0.94)) };
+  },
+  apply() {
+    const p = this.palette(this.get().warna), s = document.documentElement.style;
+    Object.keys(p).forEach(k => s.setProperty(k, p[k]));
+    const m = document.querySelector('meta[name="theme-color"]'); if (m) m.content = p['--pri'];
+  }
+};
+Data.onChange(() => Brand.fromSettings(Data.view().settings));
+
 const Shell = {
   built: false,
   build() {
     const app = $('#app');
     app.innerHTML =
-      '<aside class="sidebar" aria-label="Menu utama"><div class="side-brand"><div class="logo-mark">SM</div><div class="bt"><b>Si-MAKO</b><span id="side-biz">Konveksi</span></div>' +
+      '<aside class="sidebar" aria-label="Menu utama"><div class="side-brand">' + Brand.mark() + '<div class="bt"><b id="side-biz">' + esc(Brand.name()) + '</b><span>Si-MAKO</span></div>' +
       '<button class="btn btn-icon side-toggle" id="side-toggle" aria-label="Lebarkan menu">' + ic('panel-left') + '</button></div>' +
       '<nav id="side-nav"></nav><div class="side-foot"><nav class="side-nav">' +
       '<a href="#/lainnya" data-nav="lainnya">' + ic('settings') + '<span>Pengaturan</span></a>' +
@@ -226,7 +268,8 @@ const Shell = {
     const navId = typeof def.nav === 'function' ? def.nav() : def.nav;
     $$('[data-nav]').forEach(a => { a.classList.toggle('on', a.dataset.nav === navId); if (a.dataset.nav === navId) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
     $('#u-av').textContent = fmt.initials(me.nama); $('#u-nm').textContent = me.nama || '-'; $('#u-rl').textContent = me.peran === 'pemilik' ? 'Pemilik' : 'Admin';
-    $('#side-biz').textContent = V.settings.nama_usaha || 'Konveksi';
+    Brand.fromSettings(V.settings);
+    $('#side-biz').textContent = V.settings.nama_usaha || Brand.name();
     // header HP
     const h = def.header ? def.header(Router.param) : null;
     const mt = $('#mtop');
@@ -235,7 +278,7 @@ const Shell = {
         '<div class="title"><b>' + esc(h.title) + '</b>' + (h.sub ? '<span>' + esc(h.sub) + '</span>' : '') + '</div>' + (h.actions || '');
       const b = mt.querySelector('[data-back]'); if (b) b.onclick = () => back(h.back || 'beranda');
     } else {
-      mt.innerHTML = '<div class="title brand"><b>Si-MAKO</b><span>' + esc(V.settings.nama_usaha || 'Konveksi') + '</span></div>' +
+      mt.innerHTML = '<div class="title brand"><b>' + esc(V.settings.nama_usaha || Brand.name()) + '</b><span>Si-MAKO</span></div>' +
         '<button class="btn btn-icon" data-gsearch aria-label="Cari">' + ic('search') + '</button>' +
         '<a class="avatar" href="#/lainnya" aria-label="Akun">' + esc(fmt.initials(me.nama)) + '</a>';
       mt.querySelector('[data-gsearch]').onclick = () => openSearchSheet();

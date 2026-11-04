@@ -44,7 +44,7 @@ registerPage('pesanan', {
         '<div class="rel"><button class="btn btn-ghost btn-icon" data-act="sort" aria-label="Urutkan">' + ic('arrow-down-up') + '</button></div></div>' +
         '<div class="chips" data-chips role="tablist" aria-label="Saring pesanan"></div></div>' +
         '<div data-list class="mt12"></div>' +
-        '<a class="btn btn-primary btn-lg only-mob" href="#/pesanan-baru" style="position:fixed;right:16px;bottom:calc(var(--bnav) + var(--safe-b) + 16px);z-index:25;border-radius:28px;box-shadow:0 10px 24px -8px rgba(43,91,245,.7)">' + ic('plus') + 'Catat</a>';
+        '<a class="btn btn-primary btn-lg only-mob" href="#/pesanan-baru" style="position:fixed;right:16px;bottom:calc(var(--bnav) + var(--safe-b) + 16px);z-index:25;border-radius:28px;box-shadow:0 10px 24px -8px rgba(var(--pri-rgb),.7)">' + ic('plus') + 'Catat</a>';
       const inp = $('[data-q]', el);
       inp.value = q.q || '';
       inp.addEventListener('input', debounce(() => { const nq = Object.assign({}, Router.query, { q: inp.value.trim(), p: '1' }); setQuery(nq); this.update(el, nq); }, 250));

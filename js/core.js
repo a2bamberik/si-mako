@@ -8,7 +8,7 @@
 'use strict';
 
 const CFG = Object.assign({ API_URL: '', APP_NAME: 'Si-MAKO' }, window.SIMAKO_CONFIG || {});
-const APP_VER = '1.0.2';
+const APP_VER = '1.0.3';
 const API_CONTRACT = 'simako-api/1';   // harus sama dengan API_CONTRACT di backend 00_Config.gs
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
