@@ -32,6 +32,9 @@ function hmCalc(box) {
   const modal = () => s.rows.reduce((a, r) => a + (r.nilai || 0), 0);
   const rec = () => Math.round(modal() * (1 + s.margin / 100));
   const rounded = () => Math.ceil(rec() / 500) * 500;
+  // 'Untung % dari modal' (markup) ≠ '% dari harga jual'. Keduanya ditampilkan supaya pemilik tidak salah kira.
+  const priceUsed = () => (s.hargaManual ? s.harga : rec());
+  const pjText = () => { const h = priceUsed(), u = h - modal(); return h > 0 ? 'Dengan harga ' + fmt.rp(h) + ': untung ' + fmt.rp(u) + '/pcs = ' + fmt.dec(Math.round(u / h * 1000) / 10) + '% dari harga jual' : ''; };
   const ICONS = ['scissors', 'shirt', 'palette', 'tag', 'package'], TONES = ['amber', '', 'violet', 'green', 'slate'];
   box.innerHTML = '<div class="card card-pad"><div class="field"><label class="req" for="hm-n">Nama barang</label><input id="hm-n" class="input" data-nm value="' + esc(s.nama) + '" placeholder="Contoh: Kaos Polo CVC 24s" maxlength="120"></div></div>' +
     '<div class="card card-pad mt12"><div class="row-between mb12"><h3 class="h-sm row">' + ic('list') + 'Rincian modal per potong</h3><span class="badge blue">' + s.rows.length + ' komponen</span></div><div class="stack-sm">' +
@@ -41,17 +44,18 @@ function hmCalc(box) {
       (s.rows.length > 1 ? '<button class="btn btn-icon btn-sm" data-rm="' + i + '" aria-label="Hapus komponen" style="min-width:32px">' + ic('x', 'ico-sm') + '</button>' : '') + '</div>').join('') +
     '</div><button class="btn btn-ghost btn-sm mt12" data-add>' + ic('plus', 'ico-sm') + 'Tambah komponen</button>' +
     '<div class="row-between mt12" style="background:var(--soft-blue);padding:12px;border-radius:12px"><span class="semi">Total modal</span><span class="money-lg" style="color:var(--pri)" data-modal>' + fmt.rp(modal()) + ' <span class="small muted">/ pcs</span></span></div></div>' +
-    '<div class="card card-pad mt12" style="background:linear-gradient(160deg,var(--pri),var(--pri-active));color:#fff;border:0"><div class="row-between"><span class="overline" style="color:rgba(255,255,255,.8)">Margin keuntungan</span><span class="pill" style="background:rgba(255,255,255,.16);color:#fff" data-mg>' + s.margin + '% · laba ' + fmt.rp(rec() - modal()) + '/pcs</span></div>' +
+    '<div class="card card-pad mt12" style="background:linear-gradient(160deg,var(--pri),var(--pri-active));color:#fff;border:0"><div class="row-between"><span class="overline" style="color:rgba(255,255,255,.8)">Untung</span><span class="pill" style="background:rgba(255,255,255,.16);color:#fff" data-mg>' + s.margin + '% dari modal · untung ' + fmt.rp(rec() - modal()) + '/pcs</span></div>' +
     '<input type="range" min="0" max="100" step="1" value="' + s.margin + '" data-margin aria-label="Margin" style="width:100%;margin:14px 0 4px;accent-color:#fff">' +
     '<div class="row-between xs" style="color:rgba(255,255,255,.75)"><button class="btn-link btn btn-sm" style="color:#fff" data-pm="10">10% grosir</button><button class="btn-link btn btn-sm" style="color:#fff" data-pm="30">30% standar</button><button class="btn-link btn btn-sm" style="color:#fff" data-pm="50">50% eceran</button></div>' +
     '<div class="overline mt12" style="color:rgba(255,255,255,.8)">Harga jual rekomendasi</div><div style="font-size:34px;font-weight:800;letter-spacing:-.02em" class="num" data-rec>' + fmt.rp(rec()) + '<span style="font-size:14px;font-weight:500"> / pcs</span></div>' +
     '<button class="row mt8" data-round style="background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:12px;padding:10px 12px;width:100%;text-align:left;min-height:44px">' + ic('lightbulb') + '<span class="grow"><b data-rd>Bulatkan ke ' + fmt.rp(rounded()) + '</b><br><span class="small" style="opacity:.8">Kelipatan Rp 500 memudahkan tawar-menawar</span></span></button>' +
-    '<div class="field mt12"><label for="hm-h" style="color:rgba(255,255,255,.9)">Harga jual yang dipakai</label><div class="input-group"><span class="prefix">Rp</span><input id="hm-h" class="input money" style="color:var(--tx)" data-harga inputmode="numeric" value="' + fmt.num(s.hargaManual ? s.harga : rec()) + '"></div></div>' +
+    '<div class="field mt12"><label for="hm-h" style="color:rgba(255,255,255,.9)">Harga jual yang dipakai</label><div class="input-group"><span class="prefix">Rp</span><input id="hm-h" class="input money" style="color:var(--tx)" data-harga inputmode="numeric" value="' + fmt.num(s.hargaManual ? s.harga : rec()) + '"></div><div class="small mt8" style="color:rgba(255,255,255,.9)" data-pj>' + esc(pjText()) + '</div></div>' +
     '<button class="btn btn-block btn-lg mt12" style="background:#fff;color:var(--pri)" data-save>' + ic('bookmark-plus') + (s.id ? 'Simpan perubahan' : 'Simpan ke daftar harga') + '</button>' +
     (s.id ? '<button class="btn btn-link btn-block" style="color:#fff" data-new>Mulai hitungan baru</button>' : '') + '</div>';
   const upd = () => {
     $('[data-modal]', box).innerHTML = fmt.rp(modal()) + ' <span class="small muted">/ pcs</span>';
-    $('[data-mg]', box).textContent = s.margin + '% · laba ' + fmt.rp(rec() - modal()) + '/pcs';
+    $('[data-mg]', box).textContent = s.margin + '% dari modal · untung ' + fmt.rp(rec() - modal()) + '/pcs';
+    $('[data-pj]', box).textContent = pjText();
     $('[data-rec]', box).innerHTML = fmt.rp(rec()) + '<span style="font-size:14px;font-weight:500"> / pcs</span>';
     $('[data-rd]', box).textContent = 'Bulatkan ke ' + fmt.rp(rounded());
     if (!s.hargaManual) $('[data-harga]', box).value = fmt.num(rec());
@@ -60,7 +64,7 @@ function hmCalc(box) {
     const t = e.target;
     if (t.dataset.nm != null) { s.nama = t.value; return; }
     if (t.dataset.margin != null) { s.margin = +t.value; s.hargaManual = false; upd(); return; }
-    if (t.dataset.harga != null) { const n = parseMoney(t.value); t.value = n ? fmt.num(n) : ''; s.harga = n; s.hargaManual = true; return; }
+    if (t.dataset.harga != null) { const n = parseMoney(t.value); t.value = n ? fmt.num(n) : ''; s.harga = n; s.hargaManual = true; $('[data-pj]', box).textContent = pjText(); return; }
     const r = t.closest('[data-r]'); if (!r) return;
     const row = s.rows[+r.dataset.r];
     if (t.dataset.k === 'nilai') { const n = parseMoney(t.value); t.value = n ? fmt.num(n) : ''; row.nilai = n; upd(); } else row[t.dataset.k] = t.value;
@@ -68,7 +72,7 @@ function hmCalc(box) {
   box.onclick = async e => {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.pm) { s.margin = +b.dataset.pm; s.hargaManual = false; hmCalc(box); return; }
-    if (b.hasAttribute('data-round')) { s.harga = rounded(); s.hargaManual = true; $('[data-harga]', box).value = fmt.num(s.harga); return; }
+    if (b.hasAttribute('data-round')) { s.harga = rounded(); s.hargaManual = true; $('[data-harga]', box).value = fmt.num(s.harga); $('[data-pj]', box).textContent = pjText(); return; }
     if (b.hasAttribute('data-add')) { s.rows.push({ nama: 'Komponen lain', ket: '', nilai: 0 }); hmCalc(box); return; }
     if (b.dataset.rm != null) { s.rows.splice(+b.dataset.rm, 1); hmCalc(box); return; }
     if (b.hasAttribute('data-new')) { HM.s = hmNew(); hmCalc(box); return; }
@@ -85,7 +89,7 @@ function hmCalc(box) {
 }
 function hmList(box) {
   const V = Data.view();
-  box.innerHTML = V.priceRefs.length ? '<div class="card list">' + V.priceRefs.map(p => '<div class="li" style="cursor:default"><div class="grow"><div class="semi ellipsis">' + esc(p.nama) + '</div><div class="small muted">Modal ' + fmt.rp(p.modal_per_pcs) + ' · <span class="pill pay-lunas" style="padding:0 8px">' + fmt.dec(p.margin_persen) + '% margin</span></div></div>' +
+  box.innerHTML = V.priceRefs.length ? '<div class="card list">' + V.priceRefs.map(p => '<div class="li" style="cursor:default"><div class="grow"><div class="semi ellipsis">' + esc(p.nama) + '</div><div class="small muted">Modal ' + fmt.rp(p.modal_per_pcs) + ' · <span class="pill pay-lunas" style="padding:0 8px">' + fmt.dec(p.margin_persen) + '% dari modal</span></div></div>' +
     '<div class="right"><div class="xs muted">Harga jual</div><div class="num semi" style="color:var(--pri)">' + fmt.rp(p.harga_jual) + '</div></div><div class="rel"><button class="btn btn-icon btn-ghost" data-p="' + p.id + '" aria-label="Menu">' + ic('ellipsis-vertical') + '</button></div></div>').join('') + '</div>' +
     '<p class="small muted mt12">Daftar ini muncul di form pesanan lewat tombol <b>Daftar harga</b>.</p>'
     : '<div class="card">' + UI.empty('calculator', 'Daftar harga masih kosong', 'Hitung modal sebuah barang lalu simpan ke daftar.') + '</div>';
@@ -105,15 +109,18 @@ function materialForm(b) {
   const s = UI.sheet({ title: b.id ? 'Ubah bahan' : 'Tambah bahan', icon: 'boxes',
     body: '<form class="stack" data-mf novalidate><div class="field"><label class="req" for="mf-n">Nama bahan</label><input id="mf-n" class="input" name="nama" value="' + esc(b.nama || '') + '" placeholder="Contoh: Cotton Combed 30s Hitam" maxlength="120" autofocus></div>' +
       '<div class="grid2"><div class="field"><label for="mf-s">Satuan</label><select id="mf-s" class="select" name="satuan">' + ['kg', 'meter', 'roll', 'yard', 'pcs', 'lusin'].map(u => '<option ' + (b.satuan === u ? 'selected' : '') + '>' + u + '</option>').join('') + '</select></div>' +
-      '<div class="field"><label for="mf-m">Batas minimum</label><input id="mf-m" class="input" name="minimum" inputmode="decimal" value="' + (b.minimum != null ? b.minimum : '') + '" placeholder="0"><div class="hint">Muncul peringatan bila stok ≤ batas ini.</div></div></div>' +
-      (b.id ? '' : '<div class="field"><label for="mf-a">Stok awal</label><input id="mf-a" class="input" name="stok_awal" inputmode="decimal" placeholder="0"></div>') + '</form>',
+      '<div class="field"><label for="mf-m">Batas minimum</label><input id="mf-m" class="input" name="minimum" inputmode="decimal" value="' + (b.minimum != null ? esc(fmt.dec(b.minimum)) : '') + '" placeholder="0"><div class="hint" data-hm>Muncul peringatan bila stok ≤ batas ini.</div></div></div>' +
+      (b.id ? '' : '<div class="field"><label for="mf-a">Stok awal</label><input id="mf-a" class="input" name="stok_awal" inputmode="decimal" placeholder="0"><div class="hint" data-ha>Contoh: 1.500 (seribu lima ratus) atau 4,5</div></div>') + '</form>',
     foot: '<button class="btn btn-ghost" data-c>Batal</button><button class="btn btn-primary" data-s>Simpan</button>' });
   const reqId = uid();
+  const unitOf = () => $('#mf-s', s.body).value;
+  bindQtyHint($('#mf-m', s.body), $('[data-hm]', s.body), unitOf);
+  if (!b.id) bindQtyHint($('#mf-a', s.body), $('[data-ha]', s.body), unitOf);
   s.foot.onclick = async e => {
     if (e.target.closest('[data-c]')) return s.close();
     const btn = e.target.closest('[data-s]'); if (!btn) return;
     const d = Object.fromEntries(new FormData($('[data-mf]', s.body)).entries());
-    ['minimum', 'stok_awal'].forEach(k => { if (d[k] != null) d[k] = parseFloat(String(d[k]).replace(',', '.')) || 0; });
+    ['minimum', 'stok_awal'].forEach(k => { if (d[k] != null) d[k] = parseQty(d[k]); });
     if (!d.nama.trim()) return UI.toast('Isi nama bahan.', 'err');
     await UI.busy(btn, async () => { const r = await api('saveMaterial', Object.assign({ id: b.id }, d), { reqId }); if (!r.success) return UI.toast(r.message, 'err'); s.close(); UI.toast('Bahan tersimpan.'); });
   };
@@ -122,18 +129,19 @@ function materialMove(b, dir) {
   const V = Data.view();
   const s = UI.sheet({ title: (dir === 'masuk' ? 'Catat bahan masuk' : 'Catat bahan keluar'), sub: b.nama + ' · stok ' + fmt.dec(b.stok) + ' ' + b.satuan, icon: dir === 'masuk' ? 'package-plus' : 'package-minus',
     body: '<form class="stack" data-mv novalidate><div class="seg"><button type="button" data-d="masuk" class="' + (dir === 'masuk' ? 'on' : '') + '">Masuk (beli)</button><button type="button" data-d="keluar" class="' + (dir === 'keluar' ? 'on' : '') + '">Keluar (dipakai)</button></div>' +
-      '<div class="field"><label class="req" for="mv-j">Jumlah (' + esc(b.satuan) + ')</label><input id="mv-j" class="input" name="jumlah" inputmode="decimal" autofocus style="font-size:20px;font-weight:700"></div>' +
+      '<div class="field"><label class="req" for="mv-j">Jumlah (' + esc(b.satuan) + ')</label><input id="mv-j" class="input" name="jumlah" inputmode="decimal" autofocus style="font-size:20px;font-weight:700"><div class="hint" data-hj>Contoh: 1.500 (seribu lima ratus) atau 4,5</div></div>' +
       '<div class="field"><label for="mv-t">Tanggal</label><input id="mv-t" class="input" type="date" name="tgl" value="' + today() + '" max="' + today() + '"></div>' +
       '<div class="field" data-forord ' + (dir === 'keluar' ? '' : 'hidden') + '><label for="mv-o">Untuk pesanan <span class="faint">(opsional)</span></label><select id="mv-o" class="select" name="pesanan_id"><option value="">—</option>' + V.active.map(o => '<option value="' + o.id + '">' + esc(o.no_nota + ' · ' + o.cust.nama) + '</option>').join('') + '</select></div>' +
       '<div class="field"><label for="mv-k">Keterangan</label><input id="mv-k" class="input" name="keterangan" maxlength="200" placeholder="Contoh: beli di Toko Kain Jaya"></div></form>',
     foot: '<button class="btn btn-ghost" data-c>Batal</button><button class="btn btn-primary" data-s>Simpan</button>' });
   const reqId = uid();
+  bindQtyHint($('#mv-j', s.body), $('[data-hj]', s.body), b.satuan);
   s.body.onclick = e => { const d = e.target.closest('[data-d]'); if (d) { dir = d.dataset.d; $$('[data-d]', s.body).forEach(x => x.classList.toggle('on', x === d)); $('[data-forord]', s.body).hidden = dir !== 'keluar'; $('#sh-t', s.el).textContent = dir === 'masuk' ? 'Catat bahan masuk' : 'Catat bahan keluar'; } };
   s.foot.onclick = async e => {
     if (e.target.closest('[data-c]')) return s.close();
     const btn = e.target.closest('[data-s]'); if (!btn) return;
     const d = Object.fromEntries(new FormData($('[data-mv]', s.body)).entries());
-    const n = parseFloat(String(d.jumlah).replace(',', '.')) || 0;
+    const n = parseQty(d.jumlah);
     if (n <= 0) { $('#mv-j', s.body).classList.add('invalid'); return UI.toast('Isi jumlah.', 'err'); }
     await UI.busy(btn, async () => {
       const r = await api('materialMove', { bahan_id: b.id, masuk: dir === 'masuk' ? n : 0, keluar: dir === 'keluar' ? n : 0, tgl: d.tgl, keterangan: d.keterangan, pesanan_id: dir === 'keluar' ? d.pesanan_id : '' }, { reqId });
@@ -176,7 +184,7 @@ registerPage('stok', {
           (owner ? '<button class="btn btn-icon btn-ghost" data-ed="' + b.id + '" aria-label="Ubah bahan">' + ic('pencil') + '</button>' : '') + '</div>' +
           (mv.length ? '<details class="fold mt12"><summary class="row-between small semi muted" style="min-height:40px">Riwayat (' + mv.length + ')' + ic('chevron-down', 'ico-sm fold-ico') + '</summary><div class="stack-sm mt8">' +
             mv.slice(0, 15).map(m => '<div class="row-between small" style="border-top:1px solid var(--line);padding-top:6px;' + (m.batal ? 'opacity:.5' : '') + '"><div class="grow"><div>' + esc(m.keterangan || (m.masuk ? 'Masuk' : 'Keluar')) + (m.batal ? ' <span class="pill st-batal">dibatalkan</span>' : '') + '</div><div class="muted xs">' + fmt.date(m.tgl) + (m.pesanan_id && V.ordersById[m.pesanan_id] ? ' · ' + esc(V.ordersById[m.pesanan_id].no_nota) : '') + '</div></div><div class="right"><div class="num semi ' + (m.masuk ? 'success' : 'danger') + '">' + (m.masuk ? '+' + fmt.dec(m.masuk) : '−' + fmt.dec(m.keluar)) + '</div>' +
-              (!m.batal ? '<button class="btn-link btn btn-sm danger" data-voidmv="' + m.id + '" style="min-height:26px;padding:2px 0;font-size:11px">Batalkan</button>' : '') + '</div></div>').join('') + '</div></details>' : '') + '</div>';
+              (owner && !m.batal ? '<button class="btn-link btn btn-sm danger" data-voidmv="' + m.id + '" style="min-height:26px;padding:2px 0;font-size:11px">Batalkan</button>' : '') + '</div></div>').join('') + '</div></details>' : '') + '</div>';
       }).join('') + '</div>' : '<div class="card">' + UI.empty('boxes', 'Belum ada data bahan', owner ? 'Tambahkan bahan baku yang ingin dipantau stoknya.' : 'Minta Pemilik menambahkan daftar bahan.', owner ? '<button class="btn btn-primary mt16" data-add>' + ic('plus') + 'Tambah bahan</button>' : '') + '</div>') +
       (owner && V.materials.length ? '<button class="btn btn-soft btn-block mt12 only-mob flex" data-add>' + ic('plus') + 'Tambah bahan</button>' : '');
     el.onclick = e => {
@@ -234,7 +242,7 @@ registerPage('keuangan', {
     } else {
       const byC = {}; pOut.forEach(x => { byC[x.kategori] = (byC[x.kategori] || 0) + x.jumlah; });
       body = '<div class="row-between mb12"><div class="row wrap">' + Object.keys(byC).map(k => '<span class="tag">' + esc(k) + ': ' + fmt.rp(byC[k]) + '</span>').join('') + '</div><button class="btn btn-primary btn-sm" data-addx>' + ic('plus', 'ico-sm') + 'Catat</button></div>' +
-        (pOut.length ? '<div class="card list">' + pOut.map(x => '<div class="li"><span class="icon-box sm red">' + ic('arrow-up-right', 'ico-sm') + '</span><div class="grow"><div class="semi ellipsis">' + esc(x.keterangan || x.kategori) + '</div><div class="small muted">' + fmt.date(x.tgl) + ' · ' + esc(x.kategori) + (safeUrl(x.bukti_url) ? ' · <a href="' + safeUrl(x.bukti_url) + '" target="_blank" rel="noopener">bukti</a>' : '') + '</div></div><span class="num semi danger">−' + fmt.rp(x.jumlah) + '</span><div class="rel"><button class="btn btn-icon btn-sm" data-xm="' + x.id + '" aria-label="Menu">' + ic('ellipsis-vertical', 'ico-sm') + '</button></div></div>').join('') + '</div>'
+        (pOut.length ? '<div class="card list">' + pOut.map(x => '<div class="li"><span class="icon-box sm red">' + ic('arrow-up-right', 'ico-sm') + '</span><div class="grow"><div class="semi ellipsis">' + esc(x.keterangan || x.kategori) + '</div><div class="small muted">' + fmt.date(x.tgl) + ' · ' + esc(x.kategori) + (safeUrl(x.bukti_url) ? ' · ' + proofButton(x.bukti_url, 'bukti') : '') + '</div></div><span class="num semi danger">−' + fmt.rp(x.jumlah) + '</span><div class="rel"><button class="btn btn-icon btn-sm" data-xm="' + x.id + '" aria-label="Menu">' + ic('ellipsis-vertical', 'ico-sm') + '</button></div></div>').join('') + '</div>'
           : '<div class="card">' + UI.empty('wallet', 'Belum ada uang keluar bulan ini', 'Catat belanja bahan, gaji, listrik, dan lainnya.', '<button class="btn btn-primary mt16" data-addx>' + ic('plus') + 'Catat uang keluar</button>') + '</div>');
     }
     el.innerHTML = pageHead('Keuangan', 'Tagihan, uang masuk, dan uang keluar per bulan.', '<button class="btn btn-primary" data-addx>' + ic('plus') + 'Catat uang keluar</button>') +

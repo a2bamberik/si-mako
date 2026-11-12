@@ -1,9 +1,9 @@
 /* Si-MAKO service worker — aplikasi tetap terbuka saat sinyal putus (data dari IndexedDB).
    API (script.google.com) TIDAK pernah di-cache di sini. */
-const VER = 'simako-1.0.3';
-const SHELL = ['./', 'index.html', 'config.js', 'config.js?v=1.0.3', 'css/app.css?v=1.0.3', 'js/icons.js?v=1.0.3', 'js/core.js?v=1.0.3', 'js/ui.js?v=1.0.3',
-  'js/pages/beranda.js?v=1.0.3', 'js/pages/pesanan.js?v=1.0.3', 'js/pages/form-pesanan.js?v=1.0.3', 'js/pages/detail.js?v=1.0.3', 'js/pages/nota.js?v=1.0.3',
-  'js/pages/pelanggan.js?v=1.0.3', 'js/pages/lainnya.js?v=1.0.3', 'js/pages/manajemen.js?v=1.0.3', 'js/app.js?v=1.0.3', 'icon.svg', 'favicon.svg', 'manifest.webmanifest'];
+const VER = 'simako-1.0.4';
+const SHELL = ['./', 'index.html', 'config.js', 'config.js?v=1.0.4', 'css/app.css?v=1.0.4', 'js/icons.js?v=1.0.4', 'js/core.js?v=1.0.4', 'js/ui.js?v=1.0.4',
+  'js/pages/beranda.js?v=1.0.4', 'js/pages/pesanan.js?v=1.0.4', 'js/pages/form-pesanan.js?v=1.0.4', 'js/pages/detail.js?v=1.0.4', 'js/pages/nota.js?v=1.0.4',
+  'js/pages/pelanggan.js?v=1.0.4', 'js/pages/lainnya.js?v=1.0.4', 'js/pages/manajemen.js?v=1.0.4', 'js/app.js?v=1.0.4', 'icon.svg', 'favicon.svg', 'manifest.webmanifest'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(VER).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== VER).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
 self.addEventListener('fetch', e => {

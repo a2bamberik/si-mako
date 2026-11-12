@@ -32,6 +32,7 @@ function initForm(V, mode, orderId, query) {
     const o = V.ordersById[orderId]; if (!o) return null;
     return {
       mode: 'edit', id: o.id, diubah_pada: o.diubah_pada, step: 2, pelanggan_id: o.pelanggan_id, baru: null,
+      lockItems: !Session.owner && o.dibayar > 0,   // sudah ada pembayaran → barang & harga khusus Pemilik (server juga menolak)
       tgl_pesan: o.tgl_pesan, tenggat: o.tenggat, pakai_sablon: o.pakai_sablon, catatan_sablon: o.catatan_sablon, catatan: o.catatan,
       items: o.items.map(b => {
         const t = V.sizeTypeMap[b.jenis_ukuran_id], base = t ? t.sizes : [], qty = {}, extra = [];
@@ -80,7 +81,7 @@ function step1(V, s) {
     '<div class="grid2"><div class="field"><label for="f-tgl">Tanggal pesan</label><input id="f-tgl" type="date" class="input" data-f="tgl_pesan" value="' + esc(s.tgl_pesan) + '"></div>' +
     '<div class="field"><label class="req" for="f-tg">Tenggat selesai</label><input id="f-tg" type="date" class="input" data-f="tenggat" value="' + esc(s.tenggat) + '" min="' + esc(s.tgl_pesan) + '"></div></div>' +
     '<div class="chips mt12" aria-label="Pilih tenggat cepat">' + quick + '</div><div class="err" data-err="tenggat" hidden></div>' +
-    (s.tenggat ? '<div class="small muted mt8">Selesai ' + esc(fmt.dateLong(s.tenggat)) + ' · ' + daysBetween(s.tgl_pesan, s.tenggat) + ' hari kerja kalender</div>' : '') + '</div>';
+    (s.tenggat ? '<div class="small muted mt8">Selesai ' + esc(fmt.dateLong(s.tenggat)) + ' · ' + daysBetween(s.tgl_pesan, s.tenggat) + ' hari dari tanggal pesan</div>' : '') + '</div>';
 }
 function custResults(V, q) {
   q = q.trim().toLowerCase(); const qd = q.replace(/\D/g, '').replace(/^0/, '');
@@ -115,8 +116,19 @@ function itemCard(V, s, it, idx) {
     '<div class="field"><span class="lbl">Subtotal</span><div class="input money num" style="background:var(--soft-blue);border-color:var(--pri-tint);display:flex;align-items:center;justify-content:flex-end;color:var(--pri)" data-sub>' + fmt.rp(pcs * (it.harga_satuan || 0)) + '</div></div></div>' +
     '</div></div>';
 }
+/** Admin + pesanan yang sudah dibayar: barang ditampilkan saja, tidak bisa diubah. */
+function lockedItems(s, tot) {
+  return '<div class="banner amber"><span class="icon-box sm amber">' + ic('key-round', 'ico-sm') + '</span><div class="grow"><b>Barang & harga dikunci</b><span>Pesanan ini sudah ada pembayarannya, jadi barang dan harga hanya bisa diubah Pemilik. Tanggal, sablon, dan catatan tetap bisa diubah.</span></div></div>' +
+    '<div class="card card-pad mt12">' + s.items.map((it, i) => '<div class="row-between" style="padding:6px 0;' + (i ? 'border-top:1px solid var(--line)' : '') + '"><div class="grow"><div class="semi ellipsis">' + esc(it.jenis) + '</div><div class="small muted">' + fmt.num(tot.items[i].pcs) + ' pcs × ' + fmt.rp(it.harga_satuan) + '</div></div><div class="num semi">' + fmt.rp(tot.items[i].sub) + '</div></div>').join('') +
+    '<div class="row-between mt8" style="padding-top:8px;border-top:1px solid var(--line)"><span class="semi">Total (' + fmt.num(tot.pcs) + ' pcs)</span><span class="money-lg">' + fmt.rp(tot.total) + '</span></div></div>';
+}
+function sablonCard(s) {
+  return '<div class="card card-pad mt12"><label class="check"><input type="checkbox" data-f="pakai_sablon" ' + (s.pakai_sablon ? 'checked' : '') + '><span><b>Ada sablon / bordir</b><br><span class="small muted">Pesanan akan melewati tahap Sablon/Bordir. Bila tidak dicentang, tahap itu dilewati otomatis.</span></span></label>' +
+    (s.pakai_sablon ? '<div class="field mt12"><label for="f-cs">Posisi & desain sablon/bordir</label><textarea id="f-cs" class="textarea" data-f="catatan_sablon" maxlength="500" placeholder="Contoh: Bordir logo dada kiri, sablon nama di punggung">' + esc(s.catatan_sablon) + '</textarea></div>' : '') + '</div>';
+}
 function step2(V, s) {
   const tot = formTotals(V, s);
+  if (s.lockItems) return lockedItems(s, tot) + sablonCard(s);
   return '<div class="stack">' + s.items.map((it, i) => itemCard(V, s, it, i)).join('') + '</div>' +
     '<button type="button" class="btn btn-soft btn-block btn-lg mt12" data-act="additem">' + ic('plus') + 'Tambah barang lain</button>' +
     '<div class="card card-pad mt12"><label class="check"><input type="checkbox" data-f="pakai_sablon" ' + (s.pakai_sablon ? 'checked' : '') + '><span><b>Ada sablon / bordir</b><br><span class="small muted">Pesanan akan melewati tahap Sablon/Bordir. Bila tidak dicentang, tahap itu dilewati otomatis.</span></span></label>' +
@@ -183,7 +195,7 @@ function validateStep(V, s, el) {
     else if (s.tenggat < s.tgl_pesan) { showErr(el, 'tenggat', 'Tenggat tidak boleh sebelum tanggal pesan.'); ok = false; }
     return ok;
   }
-  if (s.step === 2) {
+  if (s.step === 2 && !s.lockItems) {
     let first = null;
     s.items.forEach(it => {
       showErr(el, 'jenis-' + it.key, ''); showErr(el, 'qty-' + it.key, '');
@@ -207,6 +219,7 @@ async function submitForm(V, s, btn) {
       ukuran: itemSizes(V, it).map(z => ({ ukuran: z, qty: parseInt(it.qty[z], 10) || 0 })).filter(z => z.qty > 0) }))
   };
   if (s.pelanggan_id) payload.pelanggan_id = s.pelanggan_id; else payload.pelanggan = s.baru;
+  if (s.lockItems) delete payload.items;          // barang tidak dikirim → server tidak menyentuhnya
   s.reqId = s.reqId || uid();          // ketukan ganda / koneksi putus → server tidak menyimpan dobel
   if (s.mode === 'edit') {
     payload.id = s.id; payload.diubah_pada = s.diubah_pada;
@@ -325,7 +338,7 @@ function bindForm(el) {
       case 'cancel': if (s.mode === 'new' && (s.pelanggan_id || s.baru) && !(await UI.confirm({ title: 'Tinggalkan form?', msg: 'Draf tetap tersimpan di perangkat ini dan bisa dilanjutkan nanti.', ok: 'Tinggalkan' }))) break; OF.s = null; back(s.mode === 'edit' ? 'pesanan' : 'beranda'); break;
       case 'prev': s.step--; s.restored = false; rerender(); window.scrollTo(0, 0); break;
       case 'next': if (!validateStep(V, s, el)) return;
-        if (s.step === 2 && !(await confirmPrices(s))) return;
+        if (s.step === 2 && !s.lockItems && !(await confirmPrices(s))) return;
         s.step++; s.restored = false; rerender(); window.scrollTo(0, 0);
         if (s.step === 2) { const f = s.items[0] && $('#j-' + s.items[0].key, el); if (f && !s.items[0].jenis) setTimeout(() => f.focus(), 50); } break;
       case 'save': if (!validateStep(V, s, el)) return; submitForm(V, s, t); break;

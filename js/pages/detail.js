@@ -26,12 +26,11 @@ function orderMenu(o, anchor) {
     !o.batal && { label: 'Pindah tahap…', icon: 'git-branch', run: () => moveStageMenu(o) },
     { label: 'Cetak / unduh nota', icon: 'printer', run: () => go('nota', o.id) },
     o.cust.wa && { label: 'Kirim kabar via WhatsApp', icon: 'message-circle', run: () => window.open(UI.waLink(o.cust.wa, waOrderText(o)), '_blank') },
-    !o.batal && { label: 'Batalkan pesanan', icon: 'ban', danger: true, run: () => cancelOrder(o) }
+    owner && !o.batal && { label: 'Batalkan pesanan', icon: 'ban', danger: true, run: () => cancelOrder(o) }
   ]);
-  if (!owner && o.dibayar > 0) { /* server tetap memeriksa */ }
 }
 async function cancelOrder(o) {
-  if (o.dibayar > 0 && !Session.owner) { UI.toast('Pesanan yang sudah dibayar hanya bisa dibatalkan Pemilik.', 'err'); return; }
+  if (!Session.owner) { UI.toast('Membatalkan pesanan hanya bisa dilakukan Pemilik.', 'err'); return; }
   // Bila belum ada uang masuk, cukup minta alasan pembatalan
   if (o.dibayar <= 0) {
     const alasan = await UI.prompt({ title: 'Batalkan pesanan?', msg: o.no_nota + ' — ' + o.cust.nama + '. Pesanan tidak dihapus, hanya ditandai batal.', label: 'Alasan pembatalan', placeholder: 'Contoh: pelanggan membatalkan', ok: 'Batalkan pesanan' });
@@ -82,6 +81,21 @@ async function voidPayment(p) {
   const r = await api('voidPayment', { id: p.id, alasan });
   UI.toast(r.success ? 'Pembayaran dibatalkan.' : r.message, r.success ? 'ok' : 'err');
 }
+/** Buka foto/PDF bukti lewat server (file di Drive tidak dibagikan publik). */
+function proofButton(url, label) { return safeUrl(url) ? '<button type="button" class="btn-link btn btn-sm" data-proof="' + safeUrl(url) + '" style="min-height:28px;padding:2px 0">' + ic('image', 'ico-sm') + ' ' + esc(label || 'Lihat bukti') + '</button>' : ''; }
+async function openProof(url) {
+  const s = UI.sheet({ title: 'Bukti pembayaran', icon: 'image', cls: 'wide', body: '<div class="sk" style="height:260px"></div><p class="small muted center mt8">Mengambil foto dari Google Drive…</p>' });
+  const r = await api('lihatBukti', { url }, { vers: false });
+  if (s.closed) return;
+  if (!r.success) { s.body.innerHTML = UI.errorBox(r.message); return; }
+  const f = r.data, isImg = /^image\/(jpeg|png|gif|webp)$/.test(f.mime), dataUrl = 'data:' + f.mime + ';base64,' + f.b64;
+  s.body.innerHTML = (isImg ? '<img src="' + dataUrl + '" alt="Bukti pembayaran" style="width:100%;border-radius:12px;background:var(--soft)">'
+      : '<div class="empty"><div class="icon-box">' + ic('file-text', 'ico-lg') + '</div><b>' + esc(f.name) + '</b><div>File PDF. Tekan Unduh untuk membukanya.</div></div>') +
+    '<div class="row wrap mt12"><button class="btn btn-primary grow" data-dl>' + ic('download') + 'Unduh</button>' +
+    (Session.owner ? '<a class="btn btn-ghost grow" href="' + safeUrl(url) + '" target="_blank" rel="noopener">Buka di Google Drive</a>' : '') + '</div>';
+  s.body.querySelector('[data-dl]').onclick = async () => { const blob = await (await fetch(dataUrl)).blob(); download(f.name || 'bukti', blob); };
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-proof]'); if (b) { e.preventDefault(); e.stopPropagation(); openProof(b.dataset.proof); } }, true);
 function methodLabel(m) { m = String(m || ''); if (m === 'tunai') return 'Tunai'; if (m === 'qris') return 'QRIS'; if (m.indexOf('transfer') === 0) return 'Transfer' + (m.split(':')[1] ? ' ' + m.split(':')[1] : ''); return m; }
 function methodIcon(m) { m = String(m || ''); return m === 'tunai' ? 'banknote' : m === 'qris' ? 'qr-code' : 'landmark'; }
 
@@ -127,7 +141,7 @@ function renderDetail(el, id) {
     '<div class="row-between mt12 small"><span class="muted semi">Pelunasan</span><span class="semi success">' + pct + '% terbayar</span></div><div class="bar-progress mt8"><i style="width:' + pct + '%"></i></div>' +
     '<div class="overline mt16 mb8">Riwayat pembayaran</div>' +
     (pays.length ? '<div class="stack-sm">' + pays.map(p => '<div class="row" style="padding:8px 0;border-top:1px solid var(--line);' + (p.batal ? 'opacity:.5' : '') + '"><span class="icon-box sm ' + (p.batal ? 'slate' : 'green') + '">' + ic(methodIcon(p.metode), 'ico-sm') + '</span><div class="grow"><div class="semi">' + esc(methodLabel(p.metode)) + (p.batal ? ' <span class="pill st-batal">dibatalkan</span>' : '') + '</div><div class="small muted">' + fmt.date(p.tgl) + ' · ' + esc(p.jenis) + (p.catatan ? ' · ' + esc(p.catatan) : '') + '</div>' +
-      (safeUrl(p.bukti_url) ? '<a class="small semi" href="' + safeUrl(p.bukti_url) + '" target="_blank" rel="noopener">' + ic('image', 'ico-sm') + ' Lihat bukti</a>' : '') + '</div><div class="right"><div class="num semi">' + fmt.rp(p.jumlah) + '</div>' +
+      proofButton(p.bukti_url) + '</div><div class="right"><div class="num semi">' + fmt.rp(p.jumlah) + '</div>' +
       (Session.owner && !p.batal ? '<button class="btn-link btn btn-sm danger" data-void="' + p.id + '" style="min-height:32px">Batalkan</button>' : '') + '</div></div>').join('') + '</div>' : '<div class="small muted">Belum ada pembayaran.</div>') +
     (!o.batal && o.sisa > 0 ? '<button class="btn btn-soft btn-block mt12 only-desk flex" data-pay>' + ic('wallet') + 'Terima bayaran</button>' : '') + '</div>';
   const hist = '<details class="card fold" ' + (matchMedia('(min-width:1024px)').matches ? 'open' : '') + '><summary class="card-head"><h3>' + ic('history') + 'Riwayat tahap <span class="badge blue">' + o.hist.length + '</span></h3>' + ic('chevron-down', 'ico fold-ico') + '</summary><div class="card-body"><div class="timeline">' +

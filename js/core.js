@@ -8,7 +8,9 @@
 'use strict';
 
 const CFG = Object.assign({ API_URL: '', APP_NAME: 'Si-MAKO' }, window.SIMAKO_CONFIG || {});
-const APP_VER = '1.0.3';
+const APP_VER = '1.0.4';
+/** Kontak dukungan yang tampil di kartu "Tentang Si-MAKO" (menu Lainnya). Isi wa dengan format 62812xxxxxxx. */
+const SUPPORT = { nama: 'Kang Aab', wa: '' };
 const API_CONTRACT = 'simako-api/1';   // harus sama dengan API_CONTRACT di backend 00_Config.gs
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
@@ -45,6 +47,19 @@ function today() { const p = jkParts(new Date()); return p.year + '-' + p.month 
 function addDays(ymd, n) { const d = fmt.parseDate(ymd); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
 function daysBetween(a, b) { const x = fmt.parseDate(a), y = fmt.parseDate(b); return x && y ? Math.round((y - x) / 864e5) : 0; }
 function parseMoney(s) { const n = parseInt(String(s == null ? '' : s).replace(/[^\d]/g, ''), 10); return isFinite(n) ? n : 0; }
+/** Jumlah desimal gaya Indonesia (stok bahan): "1.500" = 1500, "4,5" = 4,5, "1.234,5" = 1234,5. Sama dengan num_ di backend. */
+function parseQty(s) {
+  s = String(s == null ? '' : s).replace(/\s/g, '');
+  if (s.indexOf(',') > -1) s = s.replace(/\./g, '').replace(',', '.');
+  else if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');
+  const n = parseFloat(s); return isFinite(n) && n > 0 ? n : 0;
+}
+/** Tampilkan di bawah isian berapa angka yang akan disimpan, supaya salah ketik langsung kelihatan. */
+function bindQtyHint(input, hint, unit) {
+  const base = hint.textContent;
+  const f = () => { const n = parseQty(input.value); hint.textContent = input.value.trim() ? 'Akan disimpan: ' + fmt.dec(n) + ' ' + (typeof unit === 'function' ? unit() : unit || '') : base; };
+  input.addEventListener('input', f);
+}
 function greeting() { const h = +jkParts().hour; return h < 11 ? 'Selamat pagi' : h < 15 ? 'Selamat siang' : h < 18 ? 'Selamat sore' : 'Selamat malam'; }
 
 /* ---------------- penyimpanan perangkat ---------------- */
@@ -93,7 +108,7 @@ const Perf = {
 window.Perf = Perf;
 
 /* ---------------- API ---------------- */
-const READ_ACTIONS = /^(sync|health|previewNumber|systemStatus|exportAll|activityLogs)$/;
+const READ_ACTIONS = /^(sync|health|previewNumber|systemStatus|exportAll|activityLogs|lihatBukti)$/;
 const Net = { online: navigator.onLine !== false, listeners: [] };
 function setOnline(v) { if (Net.online === v) return; Net.online = v; Net.listeners.forEach(f => f(v)); }
 addEventListener('online', () => setOnline(true));
@@ -109,8 +124,8 @@ async function apiOnce(body, timeout) {
     });
     const text = await res.text();
     setOnline(true);
-    try { const j = JSON.parse(text); Perf.add(body.action, Math.round(performance.now() - t0), j.ms); return j; }
-    catch (e) { return { success: false, network: true, retryable: res.status >= 500 || res.status === 429, message: 'Server membalas tidak wajar (HTTP ' + res.status + '). Periksa alamat API di config.js.' }; }
+    try { const j = JSON.parse(text); if (j.v) Net.serverVer = j.v; Perf.add(body.action, Math.round(performance.now() - t0), j.ms); return j; }
+    catch (e) { return { success: false, network: true, retryable: res.status >= 500 || res.status === 429, message: 'Aplikasi belum bisa tersambung ke server. Coba lagi sebentar. Bila terus muncul, hubungi pengelola aplikasi dan sebutkan kode: HTTP-' + res.status + '.' }; }
   } catch (err) {
     if (navigator.onLine === false) setOnline(false);
     return { success: false, network: true, retryable: true, message: err.name === 'AbortError' ? 'Server terlalu lama merespons. Coba lagi.' : 'Tidak ada koneksi internet.' };
@@ -123,7 +138,7 @@ function waitOnline(ms) { return new Promise(r => { if (navigator.onLine !== fal
  * sehingga jawaban langsung berisi data terbaru → tampilan diperbarui tanpa panggilan kedua.
  */
 async function api(action, data, opt = {}) {
-  if (!CFG.API_URL) return { success: false, message: 'Alamat API belum diisi di config.js.', code: 'CONFIG' };
+  if (!CFG.API_URL) return { success: false, message: 'Aplikasi belum disambungkan ke server. Hubungi pengelola aplikasi (kode: CONFIG).', code: 'CONFIG' };
   const isRead = READ_ACTIONS.test(action);
   const body = { action, token: opt.token != null ? opt.token : Session.token, data: data || {} };
   if (!isRead) body.reqId = opt.reqId || uid();
@@ -135,6 +150,7 @@ async function api(action, data, opt = {}) {
     res = await apiOnce(body, isRead ? (i ? 40000 : 25000) : 90000);
     if (res.success || !res.retryable) break;
   }
+  if (res.detail) console.warn('[Si-MAKO] detail galat server (' + action + '):', res.detail);   // untuk pengelola, tidak ditampilkan ke pengguna
   if (res.sync) Data.apply(res.sync);
   if (!res.success && res.code === 'AUTH' && action !== 'login') onSessionExpired();
   return res;

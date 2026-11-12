@@ -3,6 +3,15 @@
    ============================================================ */
 'use strict';
 
+/** Tentang Si-MAKO: versi, privasi data, kontak dukungan. Tampil untuk semua pengguna. */
+function aboutCard() {
+  const wa = String(SUPPORT.wa || '').replace(/D/g, '');
+  return '<div class="section-title" style="margin:8px 0 0"><h2 class="overline">Tentang</h2></div><div class="card card-pad stack-sm">' +
+    '<div class="row">' + Brand.mark() + '<div class="grow"><b>Si-MAKO · Sistem Manajemen Konveksi</b><div class="small muted">Versi aplikasi ' + esc(APP_VER) + (Net.serverVer ? ' · server ' + esc(Net.serverVer) : '') + '</div></div></div>' +
+    '<div class="banner" style="background:var(--soft-blue);border-color:var(--pri-tint)"><span class="icon-box sm">' + ic('cloud-upload', 'ico-sm') + '</span><div><b>Data Anda milik Anda</b><span>Semua data usaha tersimpan di Google Sheet dan Google Drive milik akun Google Pemilik sendiri. Penjual Si-MAKO tidak memegang dan tidak bisa melihat data Anda.</span></div></div>' +
+    '<div class="row-between wrap" style="gap:8px"><span class="small">Butuh bantuan? Hubungi <b>' + esc(SUPPORT.nama) + '</b>' + (wa ? '' : ' (penjual Si-MAKO)') + '</span>' +
+    (wa ? '<a class="btn btn-success btn-sm" target="_blank" rel="noopener" href="' + UI.waLink(wa, 'Halo ' + SUPPORT.nama + ', saya pengguna Si-MAKO (' + (Data.view().settings.nama_usaha || '') + ', versi ' + APP_VER + '). Saya butuh bantuan: ') + '">' + ic('message-circle', 'ico-sm') + 'WhatsApp</a>' : '') + '</div></div>';
+}
 function hubRow(href, icon, tone, label, right, act) {
   return '<' + (act ? 'button data-act="' + act + '"' : 'a href="' + href + '"') + ' class="li"><span class="icon-box sm ' + tone + '">' + ic(icon, 'ico-sm') + '</span><span class="grow semi">' + esc(label) + '</span>' + (right || '') + ic('chevron-right', 'ico-sm chev') + '</' + (act ? 'button' : 'a') + '>';
 }
@@ -35,8 +44,9 @@ registerPage('lainnya', {
         hubRow('', 'refresh-cw', 'amber', 'Muat ulang data dari Sheet', '', 'refresh') +
         hubRow('#/teknis', 'wrench', 'slate', 'Menu teknis & kesehatan sistem') +
       '</div>' : '') +
+      aboutCard() +
       '<button class="btn btn-danger btn-lg btn-block mt8" data-act="logout">' + ic('log-out') + 'Keluar dari akun</button>' +
-      '<p class="small faint center">Si-MAKO v' + APP_VER + ' · data tersimpan di Google Sheet milik Pemilik</p></div>';
+      '</div>';
     el.onclick = async e => {
       const b = e.target.closest('[data-act]'); if (!b) return;
       const act = b.dataset.act;

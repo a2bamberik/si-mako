@@ -6,11 +6,14 @@
 function notaHtml(o) {
   const V = Data.view(), S = V.settings, banks = S.rekeningList || [];
   const paid = o.pays.filter(p => !p.batal);
+  // pesanan batal: nota tetap bisa dicetak untuk arsip, tapi jelas BUKAN tagihan
+  const batal = o.batal, alasan = batal ? String((String(o.catatan || '').match(/Dibatalkan:.*$/m) || [''])[0]) : '';
   return '<article class="nota" id="nota-doc">' +
     '<div class="n-head">' + (safeUrl(S.logo) ? '<img class="logo" src="' + safeUrl(S.logo) + '" alt="Logo">' : '<div class="logo">' + esc(fmt.initials(S.nama_usaha)) + '</div>') +
     '<div class="grow"><div class="h-md" style="font-weight:800">' + esc(S.nama_usaha || 'Konveksi') + '</div>' + (S.tagline ? '<div class="overline" style="color:#334155">' + esc(S.tagline) + '</div>' : '') +
     (S.alamat ? '<div class="small muted mt8">' + esc(S.alamat) + '</div>' : '') + (S.wa ? '<div class="small muted">WA ' + esc(fmt.wa(S.wa)) + '</div>' : '') + '</div></div>' +
-    '<div class="title-bar"><span>NOTA PESANAN</span><span class="num">' + esc(o.no_nota) + '</span></div>' +
+    '<div class="title-bar"' + (batal ? ' style="background:#B91C1C"' : '') + '><span>NOTA PESANAN' + (batal ? ' · DIBATALKAN' : '') + '</span><span class="num">' + esc(o.no_nota) + '</span></div>' +
+    (batal ? '<div class="box mt12" style="border:2px solid #B91C1C;background:#FEF2F2;color:#7F1D1D"><b style="font-size:16px">PESANAN INI DIBATALKAN</b><div class="small mt8">Nota ini hanya arsip dan bukan tagihan.' + (alasan ? ' ' + esc(alasan) : '') + '</div></div>' : '') +
     '<div class="grid2 small"><div><div class="muted">Tanggal pesan</div><div class="semi">' + fmt.date(o.tgl_pesan) + '</div></div><div class="right"><div class="muted">Tenggat selesai</div><div class="semi">' + fmt.date(o.tenggat) + '</div></div></div>' +
     '<div class="box mt12"><div class="overline">Kepada</div><div class="semi mt8" style="font-size:16px">' + esc(o.cust.nama) + '</div>' + (o.cust.wa ? '<div class="small">WA ' + esc(fmt.wa(o.cust.wa)) + '</div>' : '') + (o.cust.alamat ? '<div class="small muted">' + esc(o.cust.alamat) + '</div>' : '') + '</div>' +
     '<div class="mt16"><div class="row-between overline" style="border-bottom:2px solid #0F172A;padding-bottom:6px"><span>Barang & rincian ukuran</span><span>Subtotal</span></div>' +
@@ -22,12 +25,12 @@ function notaHtml(o) {
     '<div class="row-between"><span class="muted">Total (' + fmt.num(o.pcs) + ' pcs)</span><span class="bold num" style="font-size:16px">' + fmt.rp(o.total) + '</span></div>' +
     paid.map(p => '<div class="row-between small"><span class="muted">Dibayar ' + fmt.dateShort(p.tgl) + ' · ' + esc(methodLabel(p.metode)) + '</span><span class="num success">' + fmt.rp(p.jumlah) + '</span></div>').join('') +
     '<div class="row-between"><span class="muted">Sudah dibayar</span><span class="semi num success">' + fmt.rp(o.dibayar) + '</span></div></div>' +
-    '<div class="sisa-box mt12 ' + (o.sisa > 0 ? '' : 'lunas') + '"><div class="row-between"><div><div class="overline" style="color:' + (o.sisa > 0 ? '#B91C1C' : '#047857') + '">' + (o.sisa > 0 ? 'Sisa tagihan' : 'Status') + '</div>' +
-    (o.sisa > 0 ? '<div class="small muted">Mohon dilunasi sebelum barang diambil</div>' : '') + '</div><div class="money-lg" style="color:' + (o.sisa > 0 ? '#B91C1C' : '#047857') + '">' + (o.sisa > 0 ? fmt.rp(o.sisa) : 'LUNAS') + '</div></div></div>' +
-    (banks.length && o.sisa > 0 ? '<div class="box mt12"><div class="overline">Pembayaran transfer</div>' + banks.map(r => '<div class="mt8"><b>' + esc(r.bank) + ' ' + esc(r.no) + '</b><div class="small muted">a.n ' + esc(r.nama) + '</div></div>').join('') + '</div>' : '') +
+    (batal ? '' : '<div class="sisa-box mt12 ' + (o.sisa > 0 ? '' : 'lunas') + '"><div class="row-between"><div><div class="overline" style="color:' + (o.sisa > 0 ? '#B91C1C' : '#047857') + '">' + (o.sisa > 0 ? 'Sisa tagihan' : 'Status') + '</div>' +
+    (o.sisa > 0 ? '<div class="small muted">Mohon dilunasi sebelum barang diambil</div>' : '') + '</div><div class="money-lg" style="color:' + (o.sisa > 0 ? '#B91C1C' : '#047857') + '">' + (o.sisa > 0 ? fmt.rp(o.sisa) : 'LUNAS') + '</div></div></div>') +
+    (banks.length && o.sisa > 0 && !batal ? '<div class="box mt12"><div class="overline">Pembayaran transfer</div>' + banks.map(r => '<div class="mt8"><b>' + esc(r.bank) + ' ' + esc(r.no) + '</b><div class="small muted">a.n ' + esc(r.nama) + '</div></div>').join('') + '</div>' : '') +
     (S.syarat_nota ? '<div class="small muted mt12" style="line-height:1.5"><b style="color:#334155">Syarat & ketentuan:</b> ' + esc(S.syarat_nota) + '</div>' : '') +
     '<div class="sign"><div><div class="muted">Pemesan</div><div class="ln"></div><b>' + esc(o.cust.nama) + '</b></div><div><div class="muted">Hormat kami</div><div class="ln" style="display:grid;place-items:center">' +
-    (o.sisa <= 0 ? '<span class="stamp" style="color:#059669">LUNAS</span>' : o.dibayar > 0 ? '<span class="stamp" style="color:#D97706">UANG MUKA</span>' : '') + '</div><b>' + esc(S.ttd_nama || S.nama_usaha || '') + '</b></div></div>' +
+    (batal ? '<span class="stamp" style="color:#B91C1C">DIBATALKAN</span>' : o.sisa <= 0 ? '<span class="stamp" style="color:#059669">LUNAS</span>' : o.dibayar > 0 ? '<span class="stamp" style="color:#D97706">UANG MUKA</span>' : '') + '</div><b>' + esc(S.ttd_nama || S.nama_usaha || '') + '</b></div></div>' +
     '<div class="xs faint center mt16">Dicetak ' + esc(fmt.dateTime(new Date().toISOString())) + ' · Si-MAKO</div></article>';
 }
 async function notaPdf(o, btn) {
@@ -54,7 +57,7 @@ registerPage('nota', {
       '<a class="btn btn-ghost only-desk flex" href="#/pesanan/' + o.id + '">' + ic('arrow-left') + 'Kembali</a><span class="grow only-desk block"></span>' +
       '<button class="btn btn-ghost grow" data-print>' + ic('printer') + 'Cetak</button><button class="btn btn-primary grow" data-pdf>' + ic('download') + 'Unduh PDF</button></div>' +
       notaHtml(o) +
-      (o.cust.wa ? '<div class="no-print card card-pad mt12 row" style="max-width:720px;margin:12px auto 0"><span class="icon-box green">' + ic('message-circle') + '</span><div class="grow"><b>Kirim ringkasan ke WhatsApp</b><div class="small muted">Ke ' + esc(o.cust.nama) + ' (' + esc(fmt.wa(o.cust.wa)) + '). Lampirkan PDF nota secara manual bila perlu.</div></div><a class="btn btn-success" target="_blank" rel="noopener" href="' + UI.waLink(o.cust.wa, waOrderText(o)) + '">Kirim</a></div>' : '') +
+      (o.cust.wa && !o.batal ? '<div class="no-print card card-pad mt12 row" style="max-width:720px;margin:12px auto 0"><span class="icon-box green">' + ic('message-circle') + '</span><div class="grow"><b>Kirim ringkasan ke WhatsApp</b><div class="small muted">Ke ' + esc(o.cust.nama) + ' (' + esc(fmt.wa(o.cust.wa)) + '). Lampirkan PDF nota secara manual bila perlu.</div></div><a class="btn btn-success" target="_blank" rel="noopener" href="' + UI.waLink(o.cust.wa, waOrderText(o)) + '">Kirim</a></div>' : '') +
       '<div style="height:24px"></div>';
     el.onclick = e => { if (e.target.closest('[data-print]')) window.print(); const b = e.target.closest('[data-pdf]'); if (b) notaPdf(o, b); };
     if (query && query.cetak) { setQuery({}); setTimeout(() => window.print(), 400); }

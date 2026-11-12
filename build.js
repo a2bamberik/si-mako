@@ -13,7 +13,7 @@ const fs = require('fs');
 const path = require('path');
 
 const SRC = __dirname, OUT = path.join(SRC, 'dist');
-const SKIP = new Set(['build.js', 'dist', 'node_modules', 'vercel.json']);
+const SKIP = new Set(['build.js', 'dist', 'node_modules', 'vercel.json', 'README.md']);
 
 function copyDir(from, to) {
   let n = 0;
