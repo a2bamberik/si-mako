@@ -10,7 +10,7 @@
 const CFG = Object.assign({ API_URL: '', APP_NAME: 'Si-MAKO' }, window.SIMAKO_CONFIG || {});
 const APP_VER = '1.0.4';
 /** Kontak dukungan yang tampil di kartu "Tentang Si-MAKO" (menu Lainnya). Isi wa dengan format 62812xxxxxxx. */
-const SUPPORT = { nama: 'Kang Aab', wa: '' };
+const SUPPORT = { nama: 'Kang Aab', wa: '6285353204890' };
 const API_CONTRACT = 'simako-api/1';   // harus sama dengan API_CONTRACT di backend 00_Config.gs
 const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
